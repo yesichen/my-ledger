@@ -73,7 +73,9 @@ body {
 .record-item {
   display: flex; justify-content: space-between; align-items: center;
   padding: 12px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; /* 让用户知道这里可以点击 */
 }
+.record-item:active { background: #f0f0f5; } /* 点击时的反馈效果 */
 .record-item:last-child { border-bottom: none; }
 .record-item .left { flex: 1; }
 .record-item .category { font-size: 16px; font-weight: 500; }
@@ -141,18 +143,6 @@ body {
 .setting-item { margin-bottom: 16px; }
 .setting-item h3 { font-size: 16px; margin-bottom: 8px; }
 .setting-item p { font-size: 13px; color: var(--sub); margin-bottom: 8px; }
-
-/* 弹窗 */
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex;
-  align-items: center; justify-content: center; z-index: 100; padding: 16px;
-}
-.modal {
-  background: var(--card); border-radius: var(--radius); padding: 20px;
-  width: 100%; max-width: 400px; max-height: 80vh; overflow-y: auto;
-}
-.modal h3 { margin-bottom: 16px; }
-.modal .btn { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -272,7 +262,7 @@ body {
   </div>
 </div>
 
-<!-- 底部导航 (移到这里，并默认隐藏) -->
+<!-- 底部导航 -->
 <div class="tabbar hidden" id="tabbar">
   <button data-tab="records" class="active"><span class="icon">📋</span>明细</button>
   <button data-tab="add"><span class="icon">➕</span>记一笔</button>
@@ -358,7 +348,6 @@ const loginError = document.getElementById('loginError');
 function checkPassword() {
   const stored = localStorage.getItem(PWD_KEY);
   if (!stored) {
-    // 首次设置密码
     loginHint.textContent = '首次使用，请设置密码';
     loginBtn.textContent = '设置密码';
     loginBtn.onclick = () => {
@@ -385,11 +374,10 @@ function checkPassword() {
 function enterApp() {
   loginPage.classList.add('hidden');
   mainPage.classList.remove('hidden');
-  document.getElementById('tabbar').classList.remove('hidden'); // 显示底部导航栏
+  document.getElementById('tabbar').classList.remove('hidden');
   renderAll();
 }
 
-// 回车登录
 passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') loginBtn.click(); });
 
 // ==================== 页面切换 ====================
@@ -449,7 +437,7 @@ function renderRecords() {
     list.innerHTML = '<p style="text-align:center;color:var(--sub);padding:40px 0;">本月暂无记录</p>';
   } else {
     list.innerHTML = records.map(r => `
-      <div class="record-item" data-id="${r.id}">
+      <div class="record-item" data-id="${r.id}" onclick="deleteRecord(${r.id})">
         <div class="left">
           <div class="category">${r.category}</div>
           ${r.note ? `<div class="note">${r.note}</div>` : ''}
@@ -466,6 +454,18 @@ function renderRecords() {
   document.getElementById('totalExpense').textContent = formatMoney(expense);
   document.getElementById('totalBalance').textContent = formatMoney(income - expense);
 }
+
+// 👇 新增：点击记录进行删除的逻辑
+window.deleteRecord = function(id) {
+  const record = appData.records.find(r => r.id === id);
+  if (!record) return;
+  const typeText = record.type === 'income' ? '收入' : '支出';
+  if (confirm(`确定要删除这条记录吗？\n\n${typeText}：${record.category}  ${formatMoney(record.amount)}`)) {
+    appData.records = appData.records.filter(r => r.id !== id);
+    saveData(appData);
+    renderAll(); // 重新渲染明细和统计
+  }
+};
 
 // ==================== 记一笔 ====================
 const addType = document.getElementById('addType');
