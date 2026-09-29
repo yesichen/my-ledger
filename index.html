@@ -181,17 +181,8 @@ body {
     </div>
     <div class="record-list" id="recordList"></div>
   </div>
-
-  
 </div>
-<!-- 底部导航 -->
-  <div class="tabbar">
-    <button data-tab="records" class="active"><span class="icon">📋</span>明细</button>
-    <button data-tab="add"><span class="icon">➕</span>记一笔</button>
-    <button data-tab="stats"><span class="icon">📊</span>统计</button>
-    <button data-tab="categories"><span class="icon">🏷️</span>分类</button>
-    <button data-tab="settings"><span class="icon">⚙️</span>设置</button>
-  </div>
+
 <!-- 记一笔页面 -->
 <div id="addPage" class="page hidden">
   <h2 style="margin-bottom:16px;">记一笔</h2>
@@ -279,6 +270,15 @@ body {
     <h3>修改密码</h3>
     <button class="btn small secondary" id="changePasswordBtn">修改密码</button>
   </div>
+</div>
+
+<!-- 底部导航 (移到这里，并默认隐藏) -->
+<div class="tabbar hidden" id="tabbar">
+  <button data-tab="records" class="active"><span class="icon">📋</span>明细</button>
+  <button data-tab="add"><span class="icon">➕</span>记一笔</button>
+  <button data-tab="stats"><span class="icon">📊</span>统计</button>
+  <button data-tab="categories"><span class="icon">🏷️</span>分类</button>
+  <button data-tab="settings"><span class="icon">⚙️</span>设置</button>
 </div>
 
 <script>
@@ -385,6 +385,7 @@ function checkPassword() {
 function enterApp() {
   loginPage.classList.add('hidden');
   mainPage.classList.remove('hidden');
+  document.getElementById('tabbar').classList.remove('hidden'); // 显示底部导航栏
   renderAll();
 }
 
