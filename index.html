@@ -6,8 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>我的记账本</title>
-<!-- 引入 Supabase 客户端库 -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- 引入 Supabase 客户端库（替换为 unpkg 源） -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
 :root {
   --bg: #f5f5f7; --card: #ffffff; --text: #1d1d1f; --sub: #86868b;
@@ -169,11 +169,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
 
 <script>
 // ==================== 🔑 请在这里填入你的 Supabase 信息 ====================
-const SUPABASE_URL = 'https://fgmzgngccxiizfxxabcq.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_13img71eOAhUgoJMhYErnA_xyE8-6j3'; // ⚠️ 替换为你复制的 sb_publishable_ 开头的密钥
+const SUPABASE_URL = 'https://fgmzngcxoizfxxabcq.supabase.co';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // ⚠️ 替换为你复制的 sb_publishable_ 开头的密钥
 // =====================================================================
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 检查 Supabase 库是否加载成功
+if (typeof window.supabase === 'undefined') {
+  alert('错误：Supabase 库未能加载，请检查网络或 VPN 设置。');
+} else {
+  var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // ==================== 全局状态 ====================
 let currentUser = null;
@@ -206,20 +211,25 @@ document.getElementById('loginBtn').onclick = async () => {
   if (!email || password.length < 6) { loginError.textContent = '请输入有效邮箱和至少6位密码'; loginError.classList.remove('hidden'); return; }
   loginError.classList.add('hidden');
   
-  // 尝试登录，如果失败则注册
-  let { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error && error.message.includes('Invalid login credentials')) {
-    // 注册新账号
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
-    if (signUpError) { loginError.textContent = '注册失败：' + signUpError.message; loginError.classList.remove('hidden'); return; }
-    data = signUpData;
-  } else if (error) {
-    loginError.textContent = '登录失败：' + error.message; loginError.classList.remove('hidden'); return;
-  }
-  
-  if (data.user) {
-    currentUser = data.user;
-    enterApp();
+  try {
+    // 尝试登录，如果失败则注册
+    let { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error && error.message.includes('Invalid login credentials')) {
+      // 注册新账号
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (signUpError) { loginError.textContent = '注册失败：' + signUpError.message; loginError.classList.remove('hidden'); return; }
+      data = signUpData;
+    } else if (error) {
+      loginError.textContent = '登录失败：' + error.message; loginError.classList.remove('hidden'); return;
+    }
+    
+    if (data.user) {
+      currentUser = data.user;
+      enterApp();
+    }
+  } catch (err) {
+    loginError.textContent = '网络请求失败，请检查 VPN 或网络连接。' + err.message;
+    loginError.classList.remove('hidden');
   }
 };
 
@@ -247,10 +257,10 @@ async function enterApp() {
 async function pullCloudData() {
   // 拉取分类
   const { data: cats, error: catErr } = await supabase.from('ledger_categories').select('*').order('created_at', { ascending: true });
-  if (!catErr && cats.length > 0) {
+  if (!catErr && cats && cats.length > 0) {
     appData.categories = { expense: [], income: [] };
     cats.forEach(c => appData.categories[c.type].push(c.name));
-  } else if (cats.length === 0) {
+  } else if (!catErr && (!cats || cats.length === 0)) {
     // 首次使用，初始化默认分类
     appData.categories = JSON.parse(JSON.stringify(defaultCategories));
     for (const type of ['expense', 'income']) {
@@ -262,7 +272,7 @@ async function pullCloudData() {
 
   // 拉取记录
   const { data: recs, error: recErr } = await supabase.from('ledger_records').select('*').order('date', { ascending: false });
-  if (!recErr) appData.records = recs;
+  if (!recErr && recs) appData.records = recs;
 }
 
 function loadLocalData() {
@@ -277,7 +287,7 @@ function loadLocalData() {
 
 // 退出登录
 document.getElementById('logoutBtn').onclick = async () => {
-  await supabase.auth.signOut();
+  if (supabase) await supabase.auth.signOut();
   location.reload();
 };
 
@@ -336,7 +346,7 @@ window.deleteRecord = async function(id) {
   if (!record) return;
   const typeText = record.type === 'income' ? '收入' : '支出';
   if (confirm(`确定要删除这条记录吗？\n\n${typeText}：${record.category}  ${formatMoney(record.amount)}`)) {
-    if (currentUser) {
+    if (currentUser && supabase) {
       const { error } = await supabase.from('ledger_records').delete().eq('id', id);
       if (error) { alert('云端删除失败：' + error.message); return; }
     }
@@ -375,7 +385,7 @@ document.getElementById('saveRecordBtn').onclick = async () => {
 
   const newRecord = { type, amount, category, date, note };
   
-  if (currentUser) {
+  if (currentUser && supabase) {
     // 写入云端
     const { data, error } = await supabase.from('ledger_records').insert({
       user_id: currentUser.id, type, amount, category, date, note
@@ -518,7 +528,7 @@ window.editCategory = async function(index) {
   const oldName = cats[index];
   const newName = prompt('修改分类名称', oldName);
   if (newName && newName.trim() && newName !== oldName) {
-    if (currentUser) {
+    if (currentUser && supabase) {
       const { error } = await supabase.from('ledger_categories').update({ name: newName.trim() }).eq('user_id', currentUser.id).eq('type', currentCategoryType).eq('name', oldName);
       if (error) { alert('云端更新失败：' + error.message); return; }
     }
@@ -532,7 +542,7 @@ window.deleteCategory = async function(index) {
   const cats = appData.categories[currentCategoryType];
   if (cats.length <= 1) { alert('至少保留一个分类'); return; }
   if (!confirm(`确定删除分类“${cats[index]}”吗？`)) return;
-  if (currentUser) {
+  if (currentUser && supabase) {
     const { error } = await supabase.from('ledger_categories').delete().eq('user_id', currentUser.id).eq('type', currentCategoryType).eq('name', cats[index]);
     if (error) { alert('云端删除失败：' + error.message); return; }
   }
@@ -544,7 +554,7 @@ window.deleteCategory = async function(index) {
 document.getElementById('addCategoryBtn').onclick = async () => {
   const name = prompt('新分类名称');
   if (name && name.trim()) {
-    if (currentUser) {
+    if (currentUser && supabase) {
       const { error } = await supabase.from('ledger_categories').insert({ user_id: currentUser.id, type: currentCategoryType, name: name.trim() });
       if (error) { alert('云端添加失败：' + error.message); return; }
     }
@@ -570,14 +580,20 @@ document.getElementById('exportCsvBtn').onclick = () => {
 
 // ==================== 初始化 ====================
 // 检查是否已登录
-supabase.auth.getSession().then(({ data: { session } }) => {
-  if (session) {
-    currentUser = session.user;
-    enterApp();
-  } else {
-    loadLocalData(); // 未登录时加载本地数据（为了“仅本地模式”）
-  }
-});
+if (supabase) {
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) {
+      currentUser = session.user;
+      enterApp();
+    } else {
+      loadLocalData(); // 未登录时加载本地数据（为了“仅本地模式”）
+    }
+  }).catch(err => {
+    console.error('获取会话失败:', err);
+  });
+} else {
+  loadLocalData();
+}
 </script>
 </body>
 </html>
